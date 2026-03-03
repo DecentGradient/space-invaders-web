@@ -168,7 +168,8 @@ function shootBullet() {
             y: player.y,
             width: 4,
             height: 10,
-            speed: BULLET_SPEED
+            speed: BULLET_SPEED,
+            active: true
         });
     }
 }
@@ -198,12 +199,14 @@ function update(deltaTime) {
     }
 
     // Player Bullets
-    player.bullets.forEach((bullet, index) => {
+    player.bullets.forEach((bullet) => {
         bullet.y -= bullet.speed;
         if (bullet.y < 0) {
-            player.bullets.splice(index, 1);
+            bullet.active = false;
         }
     });
+    // Remove inactive bullets
+    player.bullets = player.bullets.filter(b => b.active);
 
     // Alien Movement
     let hitEdge = false;
@@ -248,25 +251,31 @@ function update(deltaTime) {
             y: shooter.y + shooter.height,
             width: 4,
             height: 10,
-            speed: 3
+            speed: 3,
+            active: true
         });
     }
 
     // Alien Bullets
-    alienBullets.forEach((bullet, index) => {
+    alienBullets.forEach((bullet) => {
         bullet.y += bullet.speed;
         if (bullet.y > CANVAS_HEIGHT) {
-            alienBullets.splice(index, 1);
+            bullet.active = false;
         }
     });
+    alienBullets = alienBullets.filter(b => b.active);
 
     checkCollisions();
 }
 
 function checkCollisions() {
     // Player Bullets hitting Aliens
-    player.bullets.forEach((bullet, bIndex) => {
-        aliens.forEach(alien => {
+    for (let i = player.bullets.length - 1; i >= 0; i--) {
+        const bullet = player.bullets[i];
+        let hit = false;
+        
+        for (let j = 0; j < aliens.length; j++) {
+            const alien = aliens[j];
             if (alien.alive &&
                 bullet.x < alien.x + alien.width &&
                 bullet.x + bullet.width > alien.x &&
@@ -274,32 +283,41 @@ function checkCollisions() {
                 bullet.y + bullet.height > alien.y) {
                 
                 alien.alive = false;
-                player.bullets.splice(bIndex, 1);
-                score += 10 + (4 - alien.type) * 10; // More points for top rows
+                hit = true;
+                score += 10 + (4 - alien.type) * 10;
                 scoreDisplay.innerText = score;
                 
-                // Speed up as aliens die
                 const livingCount = aliens.filter(a => a.alive).length;
                 alienSpeed = ALIEN_SPEED_START + (55 - livingCount) * 0.05;
+                break; // Bullet hits one alien max
             }
-        });
+        }
+        
+        if (hit) {
+            player.bullets.splice(i, 1);
+            continue;
+        }
         
         // Player Bullets hitting Bunkers
-        bunkers.forEach(bunker => {
+        for (let k = 0; k < bunkers.length; k++) {
+            const bunker = bunkers[k];
             if (bunker.health > 0 &&
                 bullet.x < bunker.x + bunker.width &&
                 bullet.x + bullet.width > bunker.x &&
                 bullet.y < bunker.y + bunker.height &&
                 bullet.y + bullet.height > bunker.y) {
                 
-                player.bullets.splice(bIndex, 1);
                 bunker.health--;
+                player.bullets.splice(i, 1);
+                break;
             }
-        });
-    });
+        }
+    }
 
     // Alien Bullets hitting Player
-    alienBullets.forEach((bullet, bIndex) => {
+    for (let i = alienBullets.length - 1; i >= 0; i--) {
+        const bullet = alienBullets[i];
+        
         if (bullet.x < player.x + player.width &&
             bullet.x + bullet.width > player.x &&
             bullet.y < player.y + player.height &&
@@ -309,18 +327,20 @@ function checkCollisions() {
         }
 
         // Alien Bullets hitting Bunkers
-        bunkers.forEach(bunker => {
+        for (let k = 0; k < bunkers.length; k++) {
+            const bunker = bunkers[k];
             if (bunker.health > 0 &&
                 bullet.x < bunker.x + bunker.width &&
                 bullet.x + bullet.width > bunker.x &&
                 bullet.y < bunker.y + bunker.height &&
                 bullet.y + bullet.height > bunker.y) {
                 
-                alienBullets.splice(bIndex, 1);
+                alienBullets.splice(i, 1);
                 bunker.health--;
+                break;
             }
-        });
-    });
+        }
+    }
     
     // Aliens hitting Bunkers
     aliens.forEach(alien => {
@@ -332,7 +352,7 @@ function checkCollisions() {
                     alien.y < bunker.y + bunker.height &&
                     alien.y + alien.height > bunker.y) {
                     
-                    bunker.health = 0; // Alien destroys bunker instantly
+                    bunker.health = 0;
                 }
             });
         }
@@ -351,7 +371,6 @@ function draw() {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     if (gameState === 'START') {
-        // Just keep the start message visible
         return;
     }
 
